@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>/STAK - Corporate VCS</title>
+    <!-- Шрифты и иконки -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg: #050505;
+            --accent: #ffffff;
+            --border: rgba(255, 255, 255, 0.1);
+            --text-dim: #888;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--accent);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            font-weight: 300;
+        }
+
+        /* Звездный фон */
+        #starfield {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+        }
+
+        /* Авторизация */
+        #auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+
+        .auth-card {
+            width: 350px;
+            text-align: center;
+        }
+
+        .stak-logo {
+            font-size: 24px;
+            letter-spacing: 0.5em;
+            margin-bottom: 50px;
+            font-weight: 100;
+        }
+
+        input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+            letter-spacing: 0.1em;
+        }
+
+        button.stak-btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: white;
+            padding: 12px 30px;
+            cursor: pointer;
+            font-size: 10px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        button.stak-btn:hover {
+            background: white;
+            color: black;
+        }
+
+        /* Главный экран */
+        #app {
+            display: none;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            background: rgba(5,5,5,0.8);
+        }
+
+        #main-layout {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Видео сетка */
+        #video-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            padding: 1px;
+        }
+
+        .video-container {
+            background: var(--bg);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-label {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 8px;
+        }
+
+        /* Чат */
+        #side-panel {
+            width: 300px;
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            background: rgba(5,5,5,0.5);
+        }
+
+        #chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .msg { margin-bottom: 15px; border-left: 1px solid var(--border); padding-left: 10px; }
+        .msg-author { font-size: 9px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
+
+        /* Управление */
+        footer {
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .control-btn:hover, .control-btn.active {
+            color: var(--accent);
+        }
+
+        .control-btn.leave { color: #551111; }
+        .control-btn.leave:hover { color: #ff4444; }
+
+        .id-badge {
+            position: fixed;
+            top: 80px;
+            right: 40px;
+            font-size: 9px;
+            color: var(--text-dim);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<!-- Экран входа -->
+<div id="auth-overlay">
+    <div class="auth-card">
+        <div class="stak-logo">/STAK</div>
+        <input type="text" id="username-input" placeholder="ВВЕДИТЕ ИМЯ СОТРУДНИКА" autocomplete="off">
+        <button class="stak-btn" onclick="startSystem()">Войти в систему</button>
+    </div>
+</div>
+
+<!-- Основной интерфейс -->
+<div id="app">
+    <header>
+        <div>/ INTERNAL_COMMUNICATION_LINK</div>
+        <div id="timer">00:00:00</div>
+    </header>
+
+    <div id="main-layout">
+        <div id="video-grid">
+            <!-- Сюда добавляются видео -->
+            <div class="video-container" id="local-video-container">
+                <video id="local-video" muted autoplay playsinline></video>
+                <div class="user-label" id="local-name">Вы</div>
+            </div>
+        </div>
+
+        <div id="side-panel">
+            <div id="chat-messages"></div>
+            <input type="text" id="chat-input" placeholder="СООБЩЕНИЕ..." style="text-align: left; padding: 20px; border-top: 1px solid var(--border);">
+        </div>
+    </div>
+
+    <div class="id-badge" onclick="copyMyID()">ID: <span id="my-id">...</span> (нажми, чтобы скопировать)</div>
+
+    <footer>
+        <button class="control-btn active" onclick="toggleMic()" id="mic-btn">Mic</button>
+        <button class="control-btn active" onclick="toggleCam()" id="cam-btn">Cam</button>
+        <button class="control-btn" onclick="shareScreen()">Share</button>
+        <button class="control-btn" onclick="connectToPeer()">Connect</button>
+        <button class="control-btn leave" onclick="location.reload()">Leave</button>
+    </footer>
+</div>
+
+<script>
+    let peer, localStream;
+    let myName = "";
+    const peers = {};
+
+    // 1. Звездное небо
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+
+    function initStars() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        stars = [];
+        for(let i=0; i<150; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                z: Math.random() * canvas.width,
+                s: Math.random() * 1.5
+            });
+        }
+    }
+
+    function drawStars() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        stars.forEach(s => {
+            let x = (s.x - canvas.width/2) * (canvas.width/s.z) + canvas.width/2;
+            let y = (s.y - canvas.height/2) * (canvas.width/s.z) + canvas.height/2;
+            let size = (1 - s.z / canvas.width) * s.s;
+            ctx.globalAlpha = size;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI*2);
+            ctx.fill();
+            s.z -= 0.5;
+            if (s.z <= 0) s.z = canvas.width;
+        });
+        requestAnimationFrame(drawStars);
+    }
+
+    // 2. Звуковой движок (Синтезатор)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        if(type === 'join') {
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+        } else if (type === 'msg') {
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+        }
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+    }
+
+    // 3. Логика системы
+    async function startSystem() {
+        myName = document.getElementById('username-input').value || "User_" + Math.floor(Math.random()*100);
+        document.getElementById('local-name').innerText = myName;
+        document.getElementById('auth-overlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('app').style.display = 'flex';
+        }, 500);
+
+        // Камера и микрофон
+        localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+        document.getElementById('local-video').srcObject = localStream;
+
+        // Инициализация Peer
+        peer = new Peer();
+        peer.on('open', id => {
+            document.getElementById('my-id').innerText = id;
+            console.log('ID получен:', id);
+        });
+
+        peer.on('call', call => {
+            call.answer(localStream);
+            const vid = document.createElement('video');
+            call.on('stream', userStream => addVideoStream(vid, userStream, "Colleague"));
+            playSound('join');
+        });
+
+        // Чат на кнопке Enter
+        document.getElementById('chat-input').addEventListener('keypress', e => {
+            if(e.key === 'Enter') sendChat(e.target.value);
+        });
+        
+        startTimer();
+    }
+
+    function addVideoStream(video, stream, label) {
+        const container = document.createElement('div');
+        container.className = 'video-container';
+        video.autoplay = true;
+        video.playsinline = true;
+        video.srcObject = stream;
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'user-label';
+        nameLabel.innerText = label;
+        container.append(video, nameLabel);
+        document.getElementById('video-grid').append(container);
+    }
+
+    function connectToPeer() {
+        const remoteId = prompt("Введите ID коллеги:");
+        if(!remoteId) return;
+        
+        const call = peer.call(remoteId, localStream);
+        const vid = document.createElement('video');
+        call.on('stream', userStream => addVideoStream(vid, userStream, "Partner"));
+        playSound('join');
+    }
+
+    function sendChat(text) {
+        if(!text) return;
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'msg';
+        msgDiv.innerHTML = `<div class="msg-author">${myName}</div><div>${text}</div>`;
+        document.getElementById('chat-messages').appendChild(msgDiv);
+        document.getElementById('chat-input').value = "";
+        playSound('msg');
+    }
+
+    function toggleMic() {
+        const enabled = localStream.getAudioTracks()[0].enabled;
+        localStream.getAudioTracks()[0].enabled = !enabled;
+        document.getElementById('mic-btn').classList.toggle('active');
+    }
+
+    function toggleCam() {
+        const enabled = localStream.getVideoTracks()[0].enabled;
+        localStream.getVideoTracks()[0].enabled = !enabled;
+        document.getElementById('cam-btn').classList.toggle('active');
+    }
+
+    function shareScreen() {
+        navigator.mediaDevices.getDisplayMedia({video: true}).then(stream => {
+            document.getElementById('local-video').srcObject = stream;
+        });
+    }
+
+    function copyMyID() {
+        const id = document.getElementById('my-id').innerText;
+        navigator.clipboard.writeText(id);
+        alert("ID скопирован. Отправьте его коллеге для подключения.");
+    }
+
+    function startTimer() {
+        let sec = 0;
+        setInterval(() => {
+            sec++;
+            let h = Math.floor(sec/3600).toString().padStart(2, '0');
+            let m = Math.floor((sec%3600)/60).toString().padStart(2, '0');
+            let s = (sec%60).toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${h}:${m}:${s}`;
+        }, 1000);
+    }
+
+    window.addEventListener('resize', initStars);
+    initStars();
+    drawStars();
+
+</script>
+</body>
+</html>
